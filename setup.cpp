@@ -16,7 +16,7 @@ Setup::Setup(int decks) : decks_(decks) {
     std::shuffle(deck_.begin(), deck_.end(), std::mt19937{std::random_device{}()});
 }
 
-void Setup::set_decks(int decks) {
+void Setup::set_decks(uint8_t decks) {
     decks_ = decks;
 }
 
