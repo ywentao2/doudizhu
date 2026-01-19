@@ -16,8 +16,13 @@ int check_winner(const std::vector<player> &players) {
         break;
       }
     }
-    if (empty)
-      return i + 1;
+    if (empty) {
+      if (players[i].is_landlord) {
+        return 1; // Landlord wins
+      } else {
+        return 0; // Peasant wins
+      }
+    }
   }
   return -1;
 }
@@ -94,54 +99,96 @@ int main() {
     std::cout << "Player " << i << " hand: " << p.hand << std::endl;
     std::cout << std::endl;
   }
+  int landlord{-1};
+  for (auto &p : players) {
+    int bet = 0;
+    int i = &p - &players[0] + 1;
+    while (true) {
+      std::cout << "Player " << i << ", enter your bet (0-3): ";
+      while (!(std::cin >> bet)) {
+          std::cout << "Invalid input, try again.\n";
+          std::cin.clear();
+          std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+      }
+      if (bet < 0 || bet > 3) {
+        std::cout << "Invalid bet, try again.\n";
+        continue;
+      }
+      if (bet == 3) {
+        p.is_landlord = true;
+        p.bet = static_cast<uint8_t>(bet);
+        std::cout << "Player " << i << " is the landlord!\n";
+        landlord = i - 1;
+        break;
+      }
+      p.bet = static_cast<uint8_t>(bet);
+      break;
+    }
+    if (landlord != -1)
+      break;
+  }
+  std::rotate(players.begin(), players.begin() + landlord, players.end());
   Move prev;
-  int passes {0};
+  int passes{0};
   while (check_winner(players) == -1) {
     for (auto &p : players) {
-      int pturn = &p - &players[0] + 1;
+      int pturn = &p - &players[0];
+      std::string who =
+          p.is_landlord ? "Landlord" : "Peasant " + std::to_string(pturn);
 
-      while (true) { // ✅ retry loop for THIS player
-        std::cout << "Player " << pturn << "'s turn. Enter your move: ";
+      while (true) {
+        std::cout << who << "'s turn. Enter your move/use '.hand' to view hand: ";
         std::string move_str;
         std::cin >> move_str;
-
+        if (move_str == ".hand") {
+          print_hand(p.hand_map);
+          continue;
+        }
         Move move{};
         process_move(move_str, move, p);
 
         if (move.type == MoveType::Invalid) {
           std::cout << "Invalid move, try again.\n";
-          continue; // ✅ same player retries
-        }
-
-        if (move.type == MoveType::Pass) {
-          // only allow pass if there's an active prev move
-          if (prev.type == MoveType::Invalid || prev.type == MoveType::Pass) {
-            std::cout << "You can't pass on a fresh trick.\n";
-            continue;
-          }
-          std::cout << "Player " << pturn << " passes.\n";
-          passes++;
-          if (passes >= (int)players.size() - 1) {
-            prev = Move{};
-            passes = 0;
-          }
-          break; // ✅ ends THIS player turn only
-        }
-
-        // if move doesn't beat prev, undo and retry
-        if (!wins(move, prev)) {
-          std::cout << "Doesn't beat previous move, try again.\n";
-          undo(p.hand_map, move.used); // because process_move already applied
           continue;
         }
 
-        std::cout << "Player " << pturn << " played: " << move_str << " ("
+        if (move.type == MoveType::Pass) {
+          if (prev.type == MoveType::Invalid || prev.type == MoveType::Pass) {
+            std::cout << "You can't pass here.\n";
+            continue;
+          }
+          std::cout << who << " passes.\n";
+          passes++;
+          if (passes >= (int)players.size() - 1) {
+            std::cout << "All other players passed.\n";
+            prev = Move{};
+            passes = 0;
+          }
+          break;
+        }
+
+        bool prevActive =
+            (prev.type != MoveType::Invalid && prev.type != MoveType::Pass);
+        if (prevActive && move.type != prev.type &&
+            move.type != MoveType::Bomb && move.type != MoveType::Rocket) {
+          std::cout << "You can't play that.\n";
+          undo(p.hand_map, move.used);
+          continue;
+        }
+
+        if (!wins(move, prev)) {
+          std::cout << "Doesn't beat previous move.\n";
+          undo(p.hand_map, move.used);
+          continue;
+        }
+
+        std::cout << who << " played: " << move_str << " ("
                   << to_string(move.type) << ")\n";
 
         print_hand(p.hand_map);
 
-        prev = move; // update table move
-        break;       // ✅ successful play ends turn
+        prev = move;
+        break;
       }
 
       if (check_winner(players) != -1)
@@ -149,6 +196,10 @@ int main() {
     }
   }
 
-  std::cout << "Player " << check_winner(players) << " wins!\n";
+  if (check_winner(players) == 1) {
+    std::cout << "Landlord wins!\n";
+  } else {
+    std::cout << "Peasants win!\n";
+  }
   return 0;
 }

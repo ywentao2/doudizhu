@@ -27,6 +27,7 @@ inline char rank(int idx) {
 struct player {
     std::string hand;
     bool is_landlord {false};
+    uint8_t bet {0};
     std::array<uint8_t, 15> hand_map; //enables random access to counts of each card rank
 };
 
