@@ -71,11 +71,16 @@ std::string to_string(MoveType t) {
 int main() {
   int t = 0;
   std::cout << "One or two decks?" << std::endl;
-  std::cin >> t;
+  while (!(std::cin >> t)) {
+    std::cout << "Enter a valid deck size.\n";
+    std::cin.clear();
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
   if (t > 2 || t < 1) {
     std::cout << "Can only play with one or two decks, set to 1" << std::endl;
     t = 1;
   }
+restart:
   Setup setup{t};
   std::vector<player> players((setup.get_decks() == 1 ? 3 : 4));
   std::vector<char> deck = setup.get_deck();
@@ -99,34 +104,65 @@ int main() {
     std::cout << "Player " << i << " hand: " << p.hand << std::endl;
     std::cout << std::endl;
   }
+  int highest_bet{0};
   int landlord{-1};
+  bool instant_landlord = false;
+
   for (auto &p : players) {
     int bet = 0;
     int i = &p - &players[0] + 1;
+
     while (true) {
       std::cout << "Player " << i << ", enter your bet (0-3): ";
+
       while (!(std::cin >> bet)) {
-          std::cout << "Invalid input, try again.\n";
-          std::cin.clear();
-          std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        std::cout << "Invalid/malformed bet size, try again.\n";
+        std::cin.clear();
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
       }
+
       if (bet < 0 || bet > 3) {
-        std::cout << "Invalid bet, try again.\n";
+        std::cout << "Please enter a bet size between 0 and 3.\n";
         continue;
       }
-      if (bet == 3) {
-        p.is_landlord = true;
-        p.bet = static_cast<uint8_t>(bet);
-        std::cout << "Player " << i << " is the landlord!\n";
-        landlord = i - 1;
-        break;
+
+      if (bet <= highest_bet && bet != 0) {
+        std::cout << "Bet must be higher than current highest bet of "
+                  << highest_bet << ", try again.\n";
+        continue;
       }
-      p.bet = static_cast<uint8_t>(bet);
+
+      p.bet = bet;
+
+      if (bet > highest_bet) {
+        highest_bet = bet;
+        landlord = i - 1;
+      }
+
+      if (bet == 3) {
+        landlord = i - 1;
+        highest_bet = 3;
+        instant_landlord = true;
+      }
+
       break;
     }
-    if (landlord != -1)
+
+    if (instant_landlord)
       break;
   }
+
+  if (landlord == -1) {
+    std::cout << "No landlord determined, restarting game.\n";
+    goto restart;
+  }
+
+  for (auto &p : players)
+    p.is_landlord = false;
+  players[landlord].is_landlord = true;
+
+  std::cout << "Player " << (landlord + 1) << " is the landlord!\n";
+
   std::rotate(players.begin(), players.begin() + landlord, players.end());
   Move prev;
   int passes{0};
@@ -137,11 +173,45 @@ int main() {
           p.is_landlord ? "Landlord" : "Peasant " + std::to_string(pturn);
 
       while (true) {
-        std::cout << who << "'s turn. Enter your move/use '.hand' to view hand: ";
+        std::cout
+            << who
+            << "'s turn. Enter your move/use '.help' to view more options: ";
         std::string move_str;
         std::cin >> move_str;
+        if (move_str == ".help") {
+          std::cout << "Commands:\n";
+          std::cout << "  .hand - View your hand\n";
+          std::cout << "  .help - View this help message\n";
+          std::cout << "  .moves - View possible moves\n";
+          continue;
+        }
         if (move_str == ".hand") {
           print_hand(p.hand_map);
+          continue;
+        }
+        if (move_str == ".moves") {
+          std::vector<Move> moves = filter_moves(generate_move(p), prev);
+          if (moves.empty()) {
+            std::cout << "No possible moves.\n";
+            std::cout << who << " passes.\n";
+            passes++;
+            if (passes >= (int)players.size() - 1) {
+              std::cout << "All other players passed.\n";
+              prev = Move{};
+              passes = 0;
+            }
+            break;
+          } else {
+            std::cout << "Possible moves:\n";
+            for (const auto &m : moves) {
+              std::string move_repr;
+              for (int i = 0; i < 15; ++i) {
+                move_repr.append((size_t)m.used[i], rank(i));
+              }
+              std::cout << "  " << move_repr << " (" << to_string(m.type)
+                        << ")\n";
+            }
+          }
           continue;
         }
         Move move{};
@@ -188,6 +258,7 @@ int main() {
         print_hand(p.hand_map);
 
         prev = move;
+        passes = 0;
         break;
       }
 

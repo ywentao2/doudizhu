@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 #include <array>
+#include <string>
+#include <vector>
 #include "setup.h"
 
 
@@ -34,3 +36,5 @@ void apply_move(std::array<uint8_t, 15>& hand_map, const std::array<uint8_t, 15>
 void undo(std::array<uint8_t, 15>& hand_map, const std::array<uint8_t, 15>& used);
 void process_move(const std::string& move_str, Move& move, player& p);
 bool wins(const Move& curr, const Move& prev);
+std::vector<Move> generate_move(const player& p);
+std::vector<Move> filter_moves(const std::vector<Move>& moves, const Move& prev);
