@@ -6,14 +6,25 @@
 #include "setup.h"
 
 Setup::Setup(int decks) : decks_(decks) {
-    deck_.reserve(static_cast<size_t>(decks_ * 54)); //reserve takes size_t, cast to avoid warnings
+    kitty.fill(0);
+    std::vector<char> temp;
+    temp.reserve(static_cast<size_t>(decks_ * 54)); //reserve takes size_t, cast to avoid warnings
     std::string ranks = "3456789TJQKA2";
     for (char c : ranks) {
-        deck_.insert(deck_.end(), 4 * decks_, c);
+        temp.insert(temp.end(), 4 * decks_, c);
     }
-    deck_.insert(deck_.end(), decks_, 'L');
-    deck_.insert(deck_.end(), decks_, 'B');
-    std::shuffle(deck_.begin(), deck_.end(), std::mt19937{std::random_device{}()});
+    temp.insert(temp.end(), decks_, 'L');
+    temp.insert(temp.end(), decks_, 'B');
+    std::shuffle(temp.begin(), temp.end(), std::mt19937{std::random_device{}()});
+    std::vector<char> tempk;
+    deck_.assign(temp.begin(), temp.end() - decks_ * 3);
+    tempk.assign(temp.end() - decks_ * 3, temp.end());
+    for (char c : tempk) {
+        int r = index(c);
+        if (r != -1) {
+            kitty[r]++;
+        }
+    }
 }
 
 void Setup::set_decks(uint8_t decks) {

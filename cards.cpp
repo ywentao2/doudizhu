@@ -1,11 +1,14 @@
 #include "move.h"
 #include "setup.h"
+#include "mcts.h"
+#include "sim.h"
 #include <algorithm>
 #include <iostream>
 #include <map>
 #include <random>
 #include <string>
 #include <vector>
+#include <chrono>
 
 int check_winner(const std::vector<player> &players) {
   for (int i = 0; i < (int)players.size(); ++i) {
@@ -33,6 +36,16 @@ void print_hand(const std::array<uint8_t, 15> &hand_map) {
     hand.append((size_t)hand_map[i], rank(i));
   }
   std::cout << "Hand: " << hand << std::endl;
+}
+
+state create_state(const std::vector<player> &players, int turn, const Move &prev, int passes, int last_player) {
+  state s;
+  s.players = players;
+  s.turn = turn;
+  s.prev = prev;
+  s.passes = passes;
+  s.last_player = last_player;
+  return s;
 }
 
 std::string to_string(MoveType t) {
@@ -70,6 +83,7 @@ std::string to_string(MoveType t) {
 
 int main() {
   int t = 0;
+  int sim = 0;
   std::cout << "One or two decks?" << std::endl;
   while (!(std::cin >> t)) {
     std::cout << "Enter a valid deck size.\n";
@@ -79,6 +93,27 @@ int main() {
   if (t > 2 || t < 1) {
     std::cout << "Can only play with one or two decks, set to 1" << std::endl;
     t = 1;
+  }
+  std::cout << "Sim mode (1-yes, 0-no)?\n";
+  while (!(std::cin >> sim)) {
+    std::cout << "Enter a valid mode (0 or 1).\n";
+    std::cin.clear();
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+  }
+  if (sim != 0 && sim != 1) {
+    std::cout << "Sim mode must be 0 or 1, set to 0" << std::endl;
+    sim = 0;
+  }
+  if (sim == 1) {
+    auto start = std::chrono::high_resolution_clock::now();
+    simulation_result result = run(100, t, 15);
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    std::cout << "Simulation completed in " << elapsed.count() << " seconds." << std::endl;
+    std::cout << "Simulation completed: " << result.games << " games played." << std::endl;
+    std::cout << "Landlord wins: " << result.landlord_wins << std::endl;
+    std::cout << "Peasant wins: " << result.peasant_wins << std::endl;
+    return 0;
   }
 restart:
   Setup setup{t};
@@ -104,6 +139,11 @@ restart:
     std::cout << "Player " << i << " hand: " << p.hand << std::endl;
     std::cout << std::endl;
   }
+
+  std::cout << "Kitty: ";
+  auto kitty_map = setup.get_kitty();
+  print_hand(kitty_map);
+
   int highest_bet{0};
   int landlord{-1};
   bool instant_landlord = false;
@@ -160,6 +200,8 @@ restart:
   for (auto &p : players)
     p.is_landlord = false;
   players[landlord].is_landlord = true;
+  for (int r = 0; r < 15; ++r)
+    players[landlord].hand_map[r] += kitty_map[r];
 
   std::cout << "Player " << (landlord + 1) << " is the landlord!\n";
 
@@ -183,6 +225,7 @@ restart:
           std::cout << "  .hand - View your hand\n";
           std::cout << "  .help - View this help message\n";
           std::cout << "  .moves - View possible moves\n";
+          std::cout << "  .best - Suggest best move\n";
           continue;
         }
         if (move_str == ".hand") {
@@ -191,7 +234,7 @@ restart:
         }
         if (move_str == ".moves") {
           std::vector<Move> moves = filter_moves(generate_move(p), prev);
-          if (moves.empty()) {
+          if (moves.size() == 1) {
             std::cout << "No possible moves.\n";
             std::cout << who << " passes.\n";
             passes++;
@@ -212,6 +255,19 @@ restart:
                         << ")\n";
             }
           }
+          continue;
+        }
+        if (move_str == ".best") {
+          state s = create_state(players, pturn, prev, passes, -1);
+          int team = p.is_landlord ? 1 : 0;
+          MCTS mcts(s, team);
+          Move best_move = mcts.search(1000);
+          std::string move_repr;
+          for (int i = 0; i < 15; ++i) {
+            move_repr.append((size_t)best_move.used[i], rank(i));
+          }
+          std::cout << "Suggested best move: " << move_repr << " ("
+                    << to_string(best_move.type) << ")\n";
           continue;
         }
         Move move{};

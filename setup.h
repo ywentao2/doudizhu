@@ -4,11 +4,12 @@
 #include <string>
 #include <iostream>
 #include <random>
+#include <sys/types.h>
 #include <vector>
 #include <array>
 #include <cstdint>
 
-inline constexpr std::array<char, 15> IDX_TO_CARD = {
+inline std::array<char, 15> IDX_TO_CARD = {
     '3','4','5','6','7','8','9','T','J','Q','K','A','2','L','B'
 };
 
@@ -29,6 +30,12 @@ struct player {
     bool is_landlord {false};
     uint8_t bet {0};
     std::array<uint8_t, 15> hand_map; //enables random access to counts of each card rank
+    inline bool empty() const {
+        for (uint8_t x : hand_map) {
+            if (x != 0) return false;
+        }
+        return true;
+    }
 };
 
 class Setup {
@@ -37,8 +44,10 @@ public:
     void set_decks(uint8_t decks);
     uint8_t get_decks() const { return decks_; }
     std::vector<char> get_deck() const { return deck_; }
+    std::array<uint8_t, 15> get_kitty() const { return kitty; }
     static bool card_order(char a, char b); //static so it can be used without an instance/in comparison functions
 private:
     uint8_t decks_ {0};
     std::vector<char> deck_;
+    std::array<uint8_t, 15> kitty;
 };

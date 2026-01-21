@@ -141,6 +141,28 @@ void process_move(const std::string &move_str, Move &move, player &p) {
       move.type = MoveType::Invalid;
     }
     return;
+  } else if (temp.length() >= 5) {
+    for (size_t i = 0; i < temp.length() - 1; ++i) {
+      int r = index(temp[i]);
+      if (index(temp[i + 1]) != index(temp[i]) + 1 || r >= index('2')) {
+        move = {};
+        move.type = MoveType::Invalid;
+        return;
+      }
+      move.used[index(temp[i])] = 1;
+    }
+    move.used[index(temp.back())] = 1;
+    move.type = MoveType::Straight;
+    move.length = temp.length();
+    move.primary_rank = index(temp.back());
+
+    if (valid_move(p.hand_map, move.used))
+      apply_move(p.hand_map, move.used);
+    else {
+      move = {};
+      move.type = MoveType::Invalid;
+    }
+    return;
   } else if (temp.length() == 8 && (temp[0] == temp[1] && temp[1] == temp[2]) &&
              (temp[3] == temp[4] && temp[4] == temp[5])) {
     move.type = MoveType::Double_Three_Carry_One;
@@ -294,34 +316,6 @@ void process_move(const std::string &move_str, Move &move, player &p) {
       apply_move(p.hand_map, move.used);
       return;
     }
-  }
-
-  else if (temp.length() >= 5) {
-    for (size_t i = 0; i < temp.length() - 1; ++i) {
-      int r = index(temp[i]);
-      if (index(temp[i + 1]) != index(temp[i]) + 1 || r >= index('2')) {
-        move = {};
-        move.type = MoveType::Invalid;
-        return;
-      }
-      move.used[index(temp[i])] = 1;
-    }
-    move.used[index(temp.back())] = 1;
-    move.type = MoveType::Straight;
-    move.length = temp.length();
-    move.primary_rank = index(temp.back());
-
-    if (valid_move(p.hand_map, move.used))
-      apply_move(p.hand_map, move.used);
-    else {
-      move = {};
-      move.type = MoveType::Invalid;
-    }
-    return;
-  } else {
-    move.type = MoveType::Invalid;
-    move.used = {};
-    return;
   }
 }
 
@@ -563,8 +557,11 @@ std::vector<Move> filter_moves(const std::vector<Move> &moves,
                                const Move &prev) {
   std::vector<Move> filtered;
   for (const auto &m : moves) {
-    if (wins(m, prev))
+    if (prev.type == MoveType::Invalid || wins(m, prev))
       filtered.push_back(m);
+  }
+  if (prev.type != MoveType::Invalid) {
+    filtered.push_back(Move{MoveType::Pass, '0', 0, 1, 0, {}});
   }
   return filtered;
 }
