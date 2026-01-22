@@ -10,6 +10,9 @@
 #include <vector>
 #include <chrono>
 
+#define games_per 500
+#define iters_per 200
+
 int check_winner(const std::vector<player> &players) {
   for (int i = 0; i < (int)players.size(); ++i) {
     bool empty = true;
@@ -106,7 +109,7 @@ int main() {
   }
   if (sim == 1) {
     auto start = std::chrono::high_resolution_clock::now();
-    simulation_result result = run(100, t, 15);
+    simulation_result result = run(games_per, t, iters_per);
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = end - start;
     std::cout << "Simulation completed in " << elapsed.count() << " seconds." << std::endl;

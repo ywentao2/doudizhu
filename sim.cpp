@@ -17,57 +17,90 @@ static void build_hand_map(player &p) {
 static int strength_score(const std::array<uint8_t, 15>& hm) {
   int score = 0;
 
-  score += hm[index('2')] * 6;
-  score += hm[index('L')] * 12;
-  score += hm[index('B')] * 15;
-
-  if (hm[index('L')] >= 1 && hm[index('B')] >= 1) score += 50;
-
-  for (int r = 0; r < 15; ++r) {
-    if (hm[r] == 4) score += 30;     
-    if (hm[r] == 3) score += 10;     
-    if (hm[r] == 2) score += 4;      
+  // Control cards (high power)
+  score += hm[index('2')] * 20;
+  score += hm[index('A')] * 15;
+  score += hm[index('K')] * 12;
+  
+  // Jokers are extremely valuable
+  score += hm[index('L')] * 25;
+  score += hm[index('B')] * 30;
+  
+  // Rocket is game-winning
+  if (hm[index('L')] >= 1 && hm[index('B')] >= 1) {
+    score += 100;
   }
 
+  // Bombs are very strong
+  for (int r = 0; r < 14; ++r) {
+    if (hm[r] == 4) score += 80;
+  }
+  
+  // Triples are good building blocks
+  for (int r = 0; r < 14; ++r) {
+    if (hm[r] == 3) score += 25;
+  }
+  
+  // Pairs are useful
+  for (int r = 0; r < 14; ++r) {
+    if (hm[r] == 2) score += 10;
+  }
+  
+  // Count singles (actually a weakness if too many odd cards)
+  int singles = 0;
+  for (int r = 0; r < 13; ++r) {
+    if (hm[r] == 1) singles++;
+  }
+  score -= singles * 3;  // Penalize unmatched cards
+
+  // Straight potential (consecutive cards)
   const int max_rank = index('A');
-  for (int s = 0; s <= max_rank;) {
-    if (hm[s] == 0) { ++s; continue; }
-    int e = s;
-    while (e <= max_rank && hm[e] >= 1) ++e;
-    int len = e - s;
-    if (len >= 5) score += 2 * len;  
-    s = e;
+  int consecutive = 0;
+  for (int r = 0; r <= max_rank; ++r) {
+    if (hm[r] >= 1) {
+      consecutive++;
+      if (consecutive >= 5) score += 15;
+    } else {
+      consecutive = 0;
+    }
+  }
+
+  // Triple sequences (airplane potential)
+  consecutive = 0;
+  for (int r = 0; r <= max_rank; ++r) {
+    if (hm[r] >= 3) {
+      consecutive++;
+      if (consecutive >= 2) score += 30;
+    } else {
+      consecutive = 0;
+    }
   }
 
   return score;
 }
 
 static int choose_landlord(const std::vector<player>& players,
-                                   const std::array<uint8_t, 15>& kitty_map) {
+                           const std::array<uint8_t, 15>& kitty_map) {
   int best = 0;
-  int bestDelta = -1e9;
-  int bestFinal = -1e9;
+  int best_final_score = -1;
 
   for (int i = 0; i < (int)players.size(); ++i) {
-    int before = strength_score(players[i].hand_map);
-
-    std::array<uint8_t, 15> afterMap = players[i].hand_map;
-    for (int r = 0; r < 15; ++r) afterMap[r] += kitty_map[r];
-
-    int after = strength_score(afterMap);
-
-    int delta = after - before;
-
-    if (delta > bestDelta || (delta == bestDelta && after > bestFinal)) {
-      bestDelta = delta;
-      bestFinal = after;
+    // Calculate what this player's hand would be WITH the kitty
+    std::array<uint8_t, 15> final_hand = players[i].hand_map;
+    for (int r = 0; r < 15; ++r) {
+      final_hand[r] += kitty_map[r];
+    }
+    
+    int final_score = strength_score(final_hand);
+    
+    if (final_score > best_final_score) {
+      best_final_score = final_score;
       best = i;
     }
   }
 
   return best;
 }
-
 
 static state make_start_state(int decks) {
   Setup setup{decks};
